@@ -18,3 +18,11 @@ Three parts: `phantom`, `forward`, `inverse`
     write, run, visualize forward
 
     modified `conv_kernel_tensor` -> `conv_kernel_tensor_arr`
+
+- Mar. 13
+
+    Finished revising `STI_inverse`
+
+    **TODO**
+
+    run `phantom`

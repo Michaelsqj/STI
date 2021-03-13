@@ -1,4 +1,4 @@
-function [chi11, chi12, chi13, chi22, chi23, chi33, flag, relres, iter, resvec] = STI_inverse(STIParams, maxit, tol, alpha, beta)
+function [chi, flag, relres, iter, resvec] = STI_inverse(STIParams, maxit, tol, alpha, beta)
     % Input:  
     %       STIParams includes fields:
     %           OriNum: Orientation Number
@@ -18,8 +18,6 @@ function [chi11, chi12, chi13, chi22, chi23, chi33, flag, relres, iter, resvec] 
     %     relres: final relative residual
     %     iter: total iteration number
     %     resvec: relative residual history
-
-    TV = TVOP;
 
     % load MO dataset
     OriNum = STIParams.OriNum;
@@ -55,8 +53,7 @@ function [chi11, chi12, chi13, chi22, chi23, chi33, flag, relres, iter, resvec] 
     
     wG = gradient_mask_all(chiavg_qsm, BrainMask, STIParams.EdgePer, 0, 0.1);  % wG is 4D
 
-    % using least square method for solving STI
-    % 
+    % --------------- using least square method for solving STI
     % setting up b for solving Ax = b;
     VoxNum = prod(sizeVol);
     b = zeros((OriNum+12)*VoxNum, 1, 'single');    % 6 for normal STI, 9 for L2, 12 for L2+maskChiani
@@ -69,63 +66,59 @@ function [chi11, chi12, chi13, chi22, chi23, chi33, flag, relres, iter, resvec] 
 
     clear temp deltaBArray
     aii_array = conv_kernel_tensor_arr(Params, OriNum);
-
-    disp('solving Susceptibility Tensor Imaging (STI) with MMSR-STI ...')
-
+    
     tic
     [chi_tensor, flag, relres, iter, resvec] = lsqr(@afun,b,tol,maxit);
     toc
 
-    % ------------------------------------------------------------------
-    % change solution format
-    chi11 = BrainMask.*reshape(chi_tensor(1:VoxNum), sizeVol(1), sizeVol(2), sizeVol(3));
-    chi12 = BrainMask.*reshape(chi_tensor((1*VoxNum+1):2*VoxNum), sizeVol(1), sizeVol(2), sizeVol(3));
-    chi13 = BrainMask.*reshape(chi_tensor((2*VoxNum+1):3*VoxNum), sizeVol(1), sizeVol(2), sizeVol(3));
-    chi22 = BrainMask.*reshape(chi_tensor((3*VoxNum+1):4*VoxNum), sizeVol(1), sizeVol(2), sizeVol(3));
-    chi23 = BrainMask.*reshape(chi_tensor((4*VoxNum+1):5*VoxNum), sizeVol(1), sizeVol(2), sizeVol(3));
-    chi33 = BrainMask.*reshape(chi_tensor((5*VoxNum+1):6*VoxNum), sizeVol(1), sizeVol(2), sizeVol(3));
+    chi = cell(3,3);
+    for ii = 1:3
+        for jj = 1:3
+            chi{ii,jj} = BrainMask.*reshape(chi_tensor(((ii-1)*3+jj-1)*VoxNum+1:((ii-1)*3+jj)*VoxNum), sizeVol(1), sizeVol(2), sizeVol(3));
+        end
+    end
 
     resvec = resvec./norm(b);                       % convert to relative residual vector
 
     % internal function including afun
     function y = afun(x,transp_flag)
-            
+        % A * chi = delta
+        % chi = A' * delta
+        % size(A) = OriNum+9+3+3, 9*VoxNum
         if strcmp(transp_flag,'transp')              % y = A'*x
-            y = zeros(6*VoxNum, 1, 'single');          % chitensor (6Nv X 1)
-            x = single(x);                             % change to single format ((Nori*Nv x 1))      
+            y = zeros(9*VoxNum, 1, 'single');          % chitensor (9VoxNum X 1)
+            x = single(x);                             % change to single format ((OriNum+9+3+3)*VoxNum)      
             
-            for orient_i = 1:OriNum
-                    Params = ParamsArray{orient_i};
-                    delta = x(((orient_i - 1)*VoxNum+1) : orient_i*VoxNum);            
-                    delta = reshape(delta, sizeVol(1), sizeVol(2), sizeVol(3));
-                    delta = fftn(delta.*Params.Weight);
-                    
-                    % from the 6N X N matrix
-                    chi11_temp = real(ifftn(a11_array(:,:,:,orient_i).*delta));
-                    chi12_temp = real(ifftn(a12_array(:,:,:,orient_i).*delta));
-                    chi13_temp = real(ifftn(a13_array(:,:,:,orient_i).*delta));
-                    chi22_temp = real(ifftn(a22_array(:,:,:,orient_i).*delta));
-                    chi23_temp = real(ifftn(a23_array(:,:,:,orient_i).*delta));
-                    chi33_temp = real(ifftn(a33_array(:,:,:,orient_i).*delta));
-
-                    y = y + [chi11_temp(:); chi12_temp(:); chi13_temp(:); chi22_temp(:); chi23_temp(:); chi33_temp(:)];                                    
+            % N orientation
+            delta = reshape(x(1:OriNum*VoxNum), VoxNum, OriNum);
+            for i = 1:3
+                for j = 1:3
+                    aii = reshape(aii_array{i,j}, VoxNum, OriNum);
+                    y(((i-1)*3+j-1)*VoxNum+1:((i-1)*3+j)*VoxNum) = y(((i-1)*3+j-1)*VoxNum+1:((i-1)*3+j)*VoxNum) + ...
+                                                                   sum(aii.*delta,2);
+                end
             end
             
-            % regularize x11, x22, x33 on ~BrainMask;
-            % regularize x12, x13, x23 on ~STIParams.maskMSA(:)
-            y = y + alpha*x((OriNum*VoxNum+1):(OriNum+6)*VoxNum).*cat(1, ~BrainMask(:), ~STIParams.maskMSA(:), ...
-                        ~STIParams.maskMSA(:), ~BrainMask(:), ~STIParams.maskMSA(:), ~BrainMask(:));
-        
-            temp = alpha*x(((OriNum+6)*VoxNum+1):(OriNum+9)*VoxNum).*repmat(~STIParams.maskMSA(:), [3,1]); 
-            y(1:VoxNum)              = y(1:VoxNum) + temp(1:VoxNum) - temp(2*VoxNum+1:3*VoxNum);                         % x11
-            y((3*VoxNum+1):4*VoxNum) = y((3*VoxNum+1):4*VoxNum) - temp(1:VoxNum) + temp(VoxNum+1:2*VoxNum);              % -x22              
-            y((5*VoxNum+1):6*VoxNum) = y((5*VoxNum+1):6*VoxNum) - temp(VoxNum+1:2*VoxNum) + temp(2*VoxNum+1:3*VoxNum);   % -x33       
-            
-            temp = beta*(TV'*(reshape(wG(:).*x(((OriNum+9)*VoxNum+1):(OriNum+12)*VoxNum), size(wG))));
-            y(1:VoxNum) = y(1:VoxNum) + temp(:);                                 % x11
-            y((3*VoxNum+1):4*VoxNum) = y((3*VoxNum+1):4*VoxNum) + temp(:);       % x22
-            y((5*VoxNum+1):6*VoxNum) = y((5*VoxNum+1):6*VoxNum) + temp(:);       % x33
+            % Regularize on BrainMask and maskMSA
+            delta = reshape(x(OriNum*VoxNum+1: (OriNum+9)*VoxNum), VoxNum, 9);
+            mask_arr = cat(2, ~BrainMask(:), ~STIParams.maskMSA(:), ~STIParams.maskMSA(:),...
+                              ~STIParams.maskMSA(:), ~BrainMask(:), ~STIParams.maskMSA(:),...
+                              ~STIParams.maskMSA(:), ~STIParams.maskMSA(:), ~BrainMask(:));
+            y = y + alpha*delta(:).*mask_arr(:);
 
+            % Regularize of chi11=chi22=chi33
+            delta = reshape(x((OriNum+9)*VoxNum+1: (OriNum+12)*VoxNum), VoxNum, 3);
+            y(1:VoxNum) = y(1:VoxNum) + (~STIParams.maskMSA(:)).* (delta(:,1)+delta(:,3));
+            y(4*VoxNum+1:5*VoxNum) = y(4*VoxNum+1:5*VoxNum) + (~STIParams.maskMSA(:)).* (-delta(:,1)+delta(:,2));
+            y(8*VoxNum+1:9*VoxNum) = y(8*VoxNum+1:9*VoxNum) + (~STIParams.maskMSA(:)).* (-delta(:,2)-delta(:,3));
+            
+            % Wg, divergence is transpose of gradient
+            delta = reshape(x((OriNum+12)*VoxNum+1: (OriNum+15)*VoxNum), sizeVol(1), sizeVol(2), sizeVol(3), 3);
+            temp = wG.*divg(delta);
+            y(1:VoxNum) = y(1:VoxNum) + temp(:);
+            y(4*VoxNum+1:5*VoxNum) = y(4*VoxNum+1:5*VoxNum) + temp(:);
+            y(8*VoxNum+1:9*VoxNum) = y(8*VoxNum+1:9*VoxNum) + temp(:);
+            
             disp('Iteration of transpose A ...')
 
         elseif strcmp(transp_flag,'notransp')            % y = A*x
@@ -135,40 +128,43 @@ function [chi11, chi12, chi13, chi22, chi23, chi33, flag, relres, iter, resvec] 
                 x11 = reshape(x(1:VoxNum), sizeVol(1), sizeVol(2), sizeVol(3));
                 x22 = reshape(x((3*VoxNum+1):4*VoxNum), sizeVol(1), sizeVol(2), sizeVol(3));
                 x33 = reshape(x((5*VoxNum+1):6*VoxNum), sizeVol(1), sizeVol(2), sizeVol(3));
-                        
-                chi11k = fftn(x11);
-                chi12k = fftn(reshape(x((1*VoxNum+1):2*VoxNum), sizeVol(1), sizeVol(2), sizeVol(3)));
-                chi13k = fftn(reshape(x((2*VoxNum+1):3*VoxNum), sizeVol(1), sizeVol(2), sizeVol(3)));
-                chi22k = fftn(x22);
-                chi23k = fftn(reshape(x((4*VoxNum+1):5*VoxNum), sizeVol(1), sizeVol(2), sizeVol(3)));
-                chi33k = fftn(x33);
+                
+                chi_k = cell(3, 3);
+                for i = 1:3
+                    for j = 1:3
+                        chi_k{i, j} = fftn(reshape(x((3*(i-1)+j-1)*VoxNum+1: (3*(i-1)+j)*VoxNum), sizeVol(1), sizeVol(2), sizeVol(3)));
+                    end
+                end
             
-                % data fidelity terms
-            for orient_i = 1:OriNum
-                    Params = ParamsArray{orient_i};    
-                    
-                    delta = a11_array(:,:,:,orient_i).*chi11k + a12_array(:,:,:,orient_i).*chi12k + a13_array(:,:,:,orient_i).*chi13k + ...
-                                a22_array(:,:,:,orient_i).*chi22k + a23_array(:,:,:,orient_i).*chi23k + a33_array(:,:,:,orient_i).*chi33k ;
+                % OriNum A*chi=delta
+                for orient_i = 1:OriNum
+                        Params = ParamsArray{orient_i};    
+                        delta = zeros(VoxNum, 'single');
+                        for i = 1:3
+                            for j = 1:3
+                                delta = delta + aii_array{i,j}(:,:,:,orient_i).*chi_k{i,j};
+                            end
+                        end
+                        delta = Params.Weight.*real(ifftn(delta));
+                        y(((orient_i - 1)*VoxNum+1) : orient_i*VoxNum) = delta(:);          
+                end
 
-                    delta = Params.Weight.*real(ifftn(delta));
+                % regularize x11, x22, x33 on ~BrainMask; 
+                % BrainMask is the region of brain on the NxNxN grid, 
+                % out of the brain, chi should 0
+                % regularize x12, x13, x21, x23, x31, x32 on ~STIParams.maskMSA(:)
+                y(OriNum*VoxNum+1:(OriNum+9)*VoxNum) = alpha*x(:).*cat(1, ~BrainMask(:), ~STIParams.maskMSA(:), ~STIParams.maskMSA(:),...
+                                                                          ~STIParams.maskMSA(:), ~BrainMask(:), ~STIParams.maskMSA(:),...
+                                                                          ~STIParams.maskMSA(:), ~STIParams.maskMSA(:), ~BrainMask(:));
+
+                y(((OriNum+9)*VoxNum+1):((OriNum+12)*VoxNum)) = alpha*repmat(~STIParams.maskMSA(:), [3,1]).*cat(1, ...
+                                    x11(:) - x22(:), x22(:) - x33(:), x33(:) - x11(:));             
+
+                % L2 regularization on edge prior
+                temp = beta*wG.*(grad(x11 + x22 + x33));
+                y(((OriNum+12)*VoxNum+1):((OriNum+15)*VoxNum)) = temp(:);
                 
-                    y(((orient_i - 1)*VoxNum+1) : orient_i*VoxNum) = delta(:);          
-            end
-
-            % regularize x11, x22, x33 on ~BrainMask; 
-            % regularize x12, x13, x23 on ~STIParams.maskMSA(:)
-            y(OriNum*VoxNum+1:(OriNum+6)*VoxNum) = alpha*x(:).*cat(1, ~BrainMask(:), ~STIParams.maskMSA(:), ...
-                        ~STIParams.maskMSA(:), ~BrainMask(:), ~STIParams.maskMSA(:), ~BrainMask(:));
-
-            y(((OriNum+6)*VoxNum+1):((OriNum+9)*VoxNum)) = alpha*repmat(~STIParams.maskMSA(:), [3,1]).*cat(1, ...
-                                x11(:) - x22(:), x22(:) - x33(:), x33(:) - x11(:));             
-                    
-            % L2 regularization on edge prior
-            TVreg = beta*wG.*(TV*(x11 + x22 + x33));
-            y(((OriNum+9)*VoxNum+1):((OriNum+12)*VoxNum)) = TVreg(:);
-
-            disp('Iteration of nontranspose A ...')
-                
+                disp('Iteration of nontranspose A ...')
         end
     end
 end
