@@ -1,6 +1,7 @@
 function aii_array = conv_kernel_tensor_arr(P, OriNum)
     % Return: aii_array: 3x3 cell, 
-    % each element is a [Nx, Ny, Nz, OriNum] array 
+    %           each element is a [Nx, Ny, Nz, OriNum] array 
+    %           if OriNum=1, each element is [Nx, Ny, Nz] array
     if isa(P, 'struct')
         Params = P;
         ParamsArray = {Params};

@@ -26,3 +26,11 @@ Three parts: `phantom`, `forward`, `inverse`
     **TODO**
 
     run `phantom`
+
+- Mar. 14
+
+    Finished revising `STI_forward` and `gen_phantom`
+
+    **TODO**
+
+    run `phantom`
