@@ -3,14 +3,16 @@
 %  9 susceptibility volumes %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-gen_phantom();  % Save phantom in .data folder
-load('data\chi_phantom.mat');
+gen_phantom('chi_phantom');  % Save phantom in .data folder
+% Content: 'Params' (B0, gamma, fov, sizeVol, voxSize, pathname, filename_chi)
+%          'chi', 'BrainMask', 'chiavg', 'chiani'
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %  Forward                  %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-STI_forward();
+STI_forward('chi_phantom');
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%

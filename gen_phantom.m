@@ -1,11 +1,11 @@
-function gen_phantom()
+function gen_phantom(filename)
     Params.B0 = 7;              % Tesla
     Params.gamma = 42.577e6;      % Hz/T
     Params.fov = [128, 128, 128];        % mm     
     Params.sizeVol = [128, 128, 128];    
     Params.voxSize = Params.fov./Params.sizeVol;    % mm
     Params.pathname = 'data\';
-    Params.filename_chi = 'data\chi_phantom.mat';
+    Params.filename_chi = ['data\', filename];
 
     chi = cell(3,3);
     % chi_distribution of numerical phantoms
@@ -44,7 +44,7 @@ function gen_phantom()
     end
   
     BrainMask = (abs(chi{1,1}) > 0);    
-
+    
     % Compute MMS (chiavg), MSA (chiani), eigvs (eigen vectors), 
     %         PEV (principle eig vector), CMAP (?)
     [chi1,chi2, chi3, eig1, eig2, eig3] = tensor2eig(chi, '');
@@ -52,6 +52,6 @@ function gen_phantom()
     chiavg = (chi1+chi2+chi3)/3;
     chiani = chi1 - (chi2+chi3)/2;
     % save phantom data
-    save(Params.filename_chi, 'Params', 'chi', 'BrainMask', 'chiavg', 'chiani', 'eigvs', 'PEV', 'CMAP')
+    save(Params.filename_chi, 'Params', 'chi', 'BrainMask', 'chiavg', 'chiani')
     disp([Params.filename_chi, ' saved.'])
 end

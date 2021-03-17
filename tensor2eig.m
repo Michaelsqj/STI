@@ -47,5 +47,5 @@ function [chi1, chi2, chi3, eig0, eig1, eig2] = tensor2eig(chi)
         end
         waitbar(iz/Nz);
     end
-    close(h)
+    close(h);
 end
