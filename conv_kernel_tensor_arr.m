@@ -31,7 +31,7 @@ function aii_array = conv_kernel_tensor_arr(P, OriNum)
     KY_Grid = ifftshift(KY_Grid);
     KZ_Grid = ifftshift(KZ_Grid);
     KSq = KX_Grid.^2 + KY_Grid.^2 + KZ_Grid.^2;          % k^2
-    K_Grid = [KX_Grid, KY_Grid, KZ_Grid];
+    K_Grid = {KX_Grid, KY_Grid, KZ_Grid};
     clear kx ky kz dkx dky dkz Nx Ny Nz
 
     H0 = [0, 0, 1]';                                                    % H0 in lab frame
@@ -45,16 +45,16 @@ function aii_array = conv_kernel_tensor_arr(P, OriNum)
     aii_array = cell(3, 3);
     for i = 1:3
         for j = 1:3
-            aii_array{i, j} = zeros([sizeVol, OriNum]);
+            aii_array{i, j} = zeros([Params.sizeVol, OriNum]);
         end
     end
 
     for OriInd = 1:OriNum
         h = [H0subArray(1,OriInd), H0subArray(2,OriInd), H0subArray(3,OriInd)];
-        KHdKSq = (K_Grid(1)*h(1) + K_Grid(2)*h(2) + K_Grid(3)*h(3))./KSq; % nan at the center
+        KHdKSq = (K_Grid{1}*h(1) + K_Grid{2}*h(2) + K_Grid{3}*h(3))./KSq; % nan at the center
         for i = 1:3
             for j = 1:3
-                aii_array{i, j}(:,:,:,OriInd) = h(i).*h(j) - KHdKSq.*K_Grid(i)*h(j);
+                aii_array{i, j}(:,:,:,OriInd) = h(i).*h(j) - KHdKSq.*K_Grid{i}*h(j);
             end
         end
     end
