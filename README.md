@@ -34,3 +34,11 @@ Three parts: `phantom`, `forward`, `inverse`
     **TODO**
 
     run `phantom`
+    
+- Mar. 19
+    
+    Finished 'STI_forward'
+    
+    **TODO**
+    
+    Debug `STI_inverse` in `MMSR-STI` and `STI`
