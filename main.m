@@ -3,6 +3,9 @@
 %  9 susceptibility volumes %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+if ~isfolder('data')
+    mkdir('data');
+end
 gen_phantom('chi_phantom');  % Save phantom in .data folder
 % Content: 'Params' (B0, gamma, fov, sizeVol, voxSize, pathname, filename_chi)
 %          'chi', 'BrainMask', 'chiavg', 'chiani'

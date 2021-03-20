@@ -4,8 +4,8 @@ function gen_phantom(filename)
     Params.fov = [128, 128, 128];        % mm     
     Params.sizeVol = [128, 128, 128];    
     Params.voxSize = Params.fov./Params.sizeVol;    % mm
-    Params.pathname = 'data\';
-    Params.filename_chi = ['data\', filename];
+    Params.pathname = 'data/';
+    Params.filename_chi = ['data/', filename];
 
     chi = cell(3,3);
     % chi_distribution of numerical phantoms
@@ -47,7 +47,7 @@ function gen_phantom(filename)
     
     % Compute MMS (chiavg), MSA (chiani), eigvs (eigen vectors), 
     %         PEV (principle eig vector), CMAP (?)
-    [chi1,chi2, chi3, eig1, eig2, eig3] = tensor2eig(chi, '');
+    [chi1,chi2, chi3, eig1, eig2, eig3] = tensor2eig(chi);
     
     chiavg = (chi1+chi2+chi3)/3;
     chiani = chi1 - (chi2+chi3)/2;
