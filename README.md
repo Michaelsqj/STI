@@ -42,3 +42,16 @@ Three parts: `phantom`, `forward`, `inverse`
     **TODO**
     
     Debug `STI_inverse` in `MMSR-STI` and `STI`
+
+- Mar. 20
+
+    Tested 'STI_inverse', temporarily reduce the wG regularization.
+
+    Finished 'evaluate'
+
+    **Problem**
+
+    - Eig slows down on reconstructed chi.
+
+    - the percentage of wG is not easy to determine. in simulation, almost 98% of
+chiavg(QSM) is 0; data from real world might be different.

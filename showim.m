@@ -3,8 +3,8 @@ function showim(image, z)
         shape = size(image);
         z = round(shape(3)/2);
     end
-    mini = min(min(min(image)));
-    maxi = max(max(max(image)));
+    mini = double(min(image, [], 'all'));
+    maxi = double(max(image, [], 'all'));
     imshow(squeeze(image(:,:,z)),[mini,maxi]);
     colorbar();
 end

@@ -12,14 +12,35 @@ gen_phantom('chi_phantom');  % Save phantom in .data folder
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  Forward                  %
+%%%%%%%    Forward     %%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 STI_forward('chi_phantom');
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  Inverse                  %
+%%%%%%%    Inverse     %%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%       STIParams includes fields:
+%           OriNum: Orientation Number
+%           fov, sizeVol, VoxSize: field of view, size of Volume, voxel size
+%           filenameFreqMap: cell array containing the filenames of frequency maps
+%           maskMSA: White Matter Mask
+%           filenameQSM: 
+%
+%       maxit: maximum number of iteration
+%       tol: convergence tolerence for LSQR
+%       alpha: regularization parameter
+%       beta: regularization parameter 
+alpha = 10;
+beta = 0.1;
+tol = 1e-4;
+maxit = 50;
+STIParams_filename = 'STIParams.mat';
+[chi_r,flag,relres,iter,resvec,lsvec]=STI_inverse(STIParams_filename, maxit, tol, alpha);
 
-STI_inverse(STIParams, maxit, tol, alpha, beta);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%    Evaluate    %%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+chi_t = load('data/chi_phantom.mat').chi;
+[RE_MMS, RE_MSA, AE] = evaluate(chi_r, chi_t);

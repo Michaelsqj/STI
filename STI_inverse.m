@@ -1,11 +1,11 @@
-function [chi, flag, relres, iter, resvec] = STI_inverse(STIParams, maxit, tol, alpha, beta)
+function [chi,flag,relres,iter,resvec,lsvec] = STI_inverse(STIParams_filename, maxit, tol, alpha)
     % Input:  
     %       STIParams includes fields:
     %           OriNum: Orientation Number
     %           fov, sizeVol, VoxSize: field of view, size of Volume, voxel size
-    %           filenameFreqMap: cell array containing the filenames of frequency maps
+    %           filename_deltaB: cell array containing the filenames of deltaB maps
     %           maskMSA: White Matter Mask
-    %           filenameQSM: 
+    %           QSM: 
     %
     %       maxit: maximum number of iteration
     %       tol: convergence tolerence for LSQR
@@ -19,56 +19,37 @@ function [chi, flag, relres, iter, resvec] = STI_inverse(STIParams, maxit, tol, 
     %     iter: total iteration number
     %     resvec: relative residual history
 
-    % load MO dataset
+    % --------------- Load Data ---------------
+    STIParams = load(['data/', STIParams_filename]).STIParams;
     OriNum = STIParams.OriNum;
     sizeVol = STIParams.sizeVol;
-
     deltaBArray = zeros(sizeVol(1), sizeVol(2), sizeVol(3), OriNum, 'single');        % in real space
     ParamsArray = cell(OriNum, 1);
-
-    % filenameFreqMap contains: Params, deltaB, BrainMask
-
     for OriInd = 1:OriNum
         disp(['loading data ', num2str(OriInd), ' ...'])    
-        S = load(STIParams.filenameFreqMap{OriInd});
-        Params = S.Params;
+        temp = load(STIParams.filename_deltaB{OriInd});
+        Params = temp.Params;
         if OriInd == 1
-            BrainMask = S.BrainMask;
+            BrainMask = temp.BrainMask;
         end
-        deltaBArray(:,:,:,OriInd) = S.deltaB.*BrainMask;                    % deltaB in real space, masked
-        Params.Weight = BrainMask;
+        deltaBArray(:,:,:,OriInd) = temp.deltaB.*BrainMask;                    % deltaB in real space, masked
+        Params.BrainMask = BrainMask;
         ParamsArray{OriInd} = Params;
     end
-
-    clear S
-    disp('Done.')
-
-    Params = ParamsArray{1};
-
-    % --------------- loading the isotropic chi from QSM fitting
-    disp('loading QSM data...')
-    S = load(STIParams.filenameQSM);
-    chiavg_qsm = S.chiavg;      % simulation
-    clear S    
+    disp('Finished Loading Data.')    
     
-    wG = gradient_mask_all(chiavg_qsm, BrainMask, STIParams.EdgePer, 0, 0.1);  % wG is 4D
-
     % --------------- using least square method for solving STI
     % setting up b for solving Ax = b;
     VoxNum = prod(sizeVol);
-    b = zeros((OriNum+12)*VoxNum, 1, 'single');    % 6 for normal STI, 9 for L2, 12 for L2+maskChiani
-
+    b = zeros((OriNum+12)*VoxNum, 1, 'single');
     for OriInd = 1:OriNum    
-        temp = deltaBArray(:,:,:,OriInd).*ParamsArray{OriInd}.Weight;    
+        temp = deltaBArray(:,:,:,OriInd).*BrainMask;    
         b(((OriInd - 1)*VoxNum+1) : OriInd*VoxNum) = temp(:);
     end
-    b((OriNum*VoxNum+1):end) = 0;           % For regularization
-
-    clear temp deltaBArray
-    aii_array = conv_kernel_tensor_arr(Params, OriNum);
+    aii_array = conv_kernel_tensor_arr(ParamsArray, OriNum);
     
     tic
-    [chi_tensor, flag, relres, iter, resvec] = lsqr(@afun,b,tol,maxit);
+    [chi_tensor,flag,relres,iter,resvec,lsvec] = lsqr(@afun,b,tol,maxit);
     toc
 
     chi = cell(3,3);
@@ -101,7 +82,7 @@ function [chi, flag, relres, iter, resvec] = STI_inverse(STIParams, maxit, tol, 
             
             % Regularize on BrainMask and maskMSA
             delta = reshape(x(OriNum*VoxNum+1: (OriNum+9)*VoxNum), VoxNum, 9);
-            mask_arr = cat(2, ~BrainMask(:), ~STIParams.maskMSA(:), ~STIParams.maskMSA(:),...
+            mask_arr = cat(1, ~BrainMask(:), ~STIParams.maskMSA(:), ~STIParams.maskMSA(:),...
                               ~STIParams.maskMSA(:), ~BrainMask(:), ~STIParams.maskMSA(:),...
                               ~STIParams.maskMSA(:), ~STIParams.maskMSA(:), ~BrainMask(:));
             y = y + alpha*delta(:).*mask_arr(:);
@@ -111,13 +92,6 @@ function [chi, flag, relres, iter, resvec] = STI_inverse(STIParams, maxit, tol, 
             y(1:VoxNum) = y(1:VoxNum) + (~STIParams.maskMSA(:)).* (delta(:,1)+delta(:,3));
             y(4*VoxNum+1:5*VoxNum) = y(4*VoxNum+1:5*VoxNum) + (~STIParams.maskMSA(:)).* (-delta(:,1)+delta(:,2));
             y(8*VoxNum+1:9*VoxNum) = y(8*VoxNum+1:9*VoxNum) + (~STIParams.maskMSA(:)).* (-delta(:,2)-delta(:,3));
-            
-            % Wg, divergence is transpose of gradient
-            delta = reshape(x((OriNum+12)*VoxNum+1: (OriNum+15)*VoxNum), sizeVol(1), sizeVol(2), sizeVol(3), 3);
-            temp = wG.*divg(delta);
-            y(1:VoxNum) = y(1:VoxNum) + temp(:);
-            y(4*VoxNum+1:5*VoxNum) = y(4*VoxNum+1:5*VoxNum) + temp(:);
-            y(8*VoxNum+1:9*VoxNum) = y(8*VoxNum+1:9*VoxNum) + temp(:);
             
             disp('Iteration of transpose A ...')
 
@@ -135,20 +109,21 @@ function [chi, flag, relres, iter, resvec] = STI_inverse(STIParams, maxit, tol, 
                         chi_k{i, j} = fftn(reshape(x((3*(i-1)+j-1)*VoxNum+1: (3*(i-1)+j)*VoxNum), sizeVol(1), sizeVol(2), sizeVol(3)));
                     end
                 end
-            
+                            
+
                 % OriNum A*chi=delta
                 for orient_i = 1:OriNum
                         Params = ParamsArray{orient_i};    
-                        delta = zeros(VoxNum, 'single');
+                        delta = zeros(sizeVol, 'double');
                         for i = 1:3
                             for j = 1:3
                                 delta = delta + aii_array{i,j}(:,:,:,orient_i).*chi_k{i,j};
                             end
                         end
-                        delta = Params.Weight.*real(ifftn(delta));
+                        delta = Params.BrainMask.*real(ifftn(delta));
                         y(((orient_i - 1)*VoxNum+1) : orient_i*VoxNum) = delta(:);          
                 end
-
+                
                 % regularize x11, x22, x33 on ~BrainMask; 
                 % BrainMask is the region of brain on the NxNxN grid, 
                 % out of the brain, chi should 0
@@ -159,10 +134,6 @@ function [chi, flag, relres, iter, resvec] = STI_inverse(STIParams, maxit, tol, 
 
                 y(((OriNum+9)*VoxNum+1):((OriNum+12)*VoxNum)) = alpha*repmat(~STIParams.maskMSA(:), [3,1]).*cat(1, ...
                                     x11(:) - x22(:), x22(:) - x33(:), x33(:) - x11(:));             
-
-                % L2 regularization on edge prior
-                temp = beta*wG.*(grad(x11 + x22 + x33));
-                y(((OriNum+12)*VoxNum+1):((OriNum+15)*VoxNum)) = temp(:);
                 
                 disp('Iteration of nontranspose A ...')
         end

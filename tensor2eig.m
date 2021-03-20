@@ -44,8 +44,9 @@ function [chi1, chi2, chi3, eig0, eig1, eig2] = tensor2eig(chi)
                 eig2(:, iy, ix, iz) = V(:, Ind(end-2));
 
             end
+            waitbar(iz/Nz, h, [int2str(iz),' ',int2str(iy),' ',int2str(ix)]);
+
         end
-        waitbar(iz/Nz);
     end
     close(h);
 end
