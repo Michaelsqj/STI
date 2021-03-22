@@ -55,3 +55,12 @@ Three parts: `phantom`, `forward`, `inverse`
 
     - the percentage of wG is not easy to determine. in simulation, almost 98% of
 chiavg(QSM) is 0; data from real world might be different.
+
+- Mar. 22
+
+    Run `MMSR-STI`, added chemical shift
+
+    **TODO**
+
+    Run the inverse for enough iters (e.g., 1000), and compare the results, between TV
+regularization, 9 elements tensor, and chemical shift.
