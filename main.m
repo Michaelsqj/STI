@@ -2,6 +2,10 @@
 %      Create phantoms      %
 %  9 susceptibility volumes %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+clear
+close all
+
+addpath('utils/')
 
 if ~isfolder('data')
     mkdir('data');

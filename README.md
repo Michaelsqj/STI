@@ -40,13 +40,13 @@ STI/
 
 |
 
-|-- InputData/
+|-- Params/
 
 |&emsp;|-- OriAngles.mat 
 
 |&emsp;|--Phantoms.mat (store different phantom parameters)
 
-|-- OutputData/
+|-- data/
 
 |
 
