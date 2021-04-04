@@ -54,7 +54,7 @@ function aii_array = conv_kernel_tensor_arr(P, OriNum)
         KHdKSq = (K_Grid{1}*h(1) + K_Grid{2}*h(2) + K_Grid{3}*h(3))./KSq; % nan at the center
         for i = 1:3
             for j = 1:3
-                aii_array{i, j}(:,:,:,OriInd) = h(i).*h(j) - KHdKSq.*K_Grid{i}*h(j);
+                aii_array{i, j}(:,:,:,OriInd) = h(i).*h(j)/3 - KHdKSq.*K_Grid{i}*h(j);
             end
         end
     end

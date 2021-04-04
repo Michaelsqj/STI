@@ -21,7 +21,7 @@ function [chi1, chi2, chi3, eig0, eig1, eig2] = tensor2eig(chi)
     eig2 = eig0;
 
     % loop through each voxel
-    h = waitbar(0, 'doing diagonalization...');
+    disp('doing diagonalization...');
     for iz = 1:Nz
         for iy = 1:Ny
             for ix = 1:Nx      
@@ -35,18 +35,16 @@ function [chi1, chi2, chi3, eig0, eig1, eig2] = tensor2eig(chi)
                 chidiag = diag(D);
                 [B, Ind] = sort(chidiag);
 
-                chi1(iy, ix, iz) = B(end);
-                chi2(iy, ix, iz) = B(end-1);
-                chi3(iy, ix, iz) = B(end-2);
+                chi1(ix, iy, iz) = B(end);
+                chi2(ix, iy, iz) = B(end-1);
+                chi3(ix, iy, iz) = B(end-2);
 
-                eig0(:, iy, ix, iz) = V(:, Ind(end));   % priciple eigen vector
-                eig1(:, iy, ix, iz) = V(:, Ind(end-1));
-                eig2(:, iy, ix, iz) = V(:, Ind(end-2));
+                eig0(:, ix, iy, iz) = V(:, Ind(end));   % priciple eigen vector
+                eig1(:, ix, iy, iz) = V(:, Ind(end-1));
+                eig2(:, ix, iy, iz) = V(:, Ind(end-2));
 
             end
-            waitbar(iz/Nz, h, [int2str(iz),' ',int2str(iy),' ',int2str(ix)]);
-
         end
     end
-    close(h);
+    disp('finished diagonalization');
 end

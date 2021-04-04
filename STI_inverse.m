@@ -20,7 +20,7 @@ function [chi,flag,relres,iter,resvec,lsvec] = STI_inverse(STIParams_filename, m
     %     resvec: relative residual history
 
     % --------------- Load Data ---------------
-    STIParams = load(['data/', STIParams_filename]).STIParams;
+    STIParams = load(STIParams_filename).STIParams;
     OriNum = STIParams.OriNum;
     sizeVol = STIParams.sizeVol;
     deltaBArray = zeros(sizeVol(1), sizeVol(2), sizeVol(3), OriNum, 'single');        % in real space
@@ -71,27 +71,37 @@ function [chi,flag,relres,iter,resvec,lsvec] = STI_inverse(STIParams_filename, m
             x = single(x);                             % change to single format ((OriNum+9+3+3)*VoxNum)      
             
             % N orientation
-            delta = reshape(x(1:OriNum*VoxNum), VoxNum, OriNum);
-            for i = 1:3
-                for j = 1:3
-                    aii = reshape(aii_array{i,j}, VoxNum, OriNum);
-                    y(((i-1)*3+j-1)*VoxNum+1:((i-1)*3+j)*VoxNum) = y(((i-1)*3+j-1)*VoxNum+1:((i-1)*3+j)*VoxNum) + ...
-                                                                   sum(aii.*delta,2);
+            for orient_i = 1:OriNum
+                Params = ParamsArray{orient_i};
+                delta = x(((orient_i - 1)*VoxNum+1) : orient_i*VoxNum);            
+                delta = reshape(delta, sizeVol(1), sizeVol(2), sizeVol(3));
+                delta = fftn(delta.*Params.BrainMask);
+                
+                chi_temp = cell(3,3);
+                for i = 1:3
+                    for j = 1:3
+                        chi_temp{i,j} = real(ifftn(aii_array{i,j}(:,:,:,orient_i).*delta));
+                    end
                 end
+                y = y + [chi_temp{1,1}(:);chi_temp{1,2}(:);chi_temp{1,3}(:);...
+                         chi_temp{2,1}(:);chi_temp{2,2}(:);chi_temp{2,3}(:);...
+                         chi_temp{3,1}(:);chi_temp{3,2}(:);chi_temp{3,3}(:)];                                    
             end
-            
-            % Regularize on BrainMask and maskMSA
-            delta = reshape(x(OriNum*VoxNum+1: (OriNum+9)*VoxNum), VoxNum, 9);
+
+
+            % Regularize on ~BrainMask: chi11,chi22,chi33=0;
+            % Regularize on ~maskMSA: chi12, chi13, chi23=0;
+            delta = x(OriNum*VoxNum+1: (OriNum+9)*VoxNum);
             mask_arr = cat(1, ~BrainMask(:), ~STIParams.maskMSA(:), ~STIParams.maskMSA(:),...
                               ~STIParams.maskMSA(:), ~BrainMask(:), ~STIParams.maskMSA(:),...
                               ~STIParams.maskMSA(:), ~STIParams.maskMSA(:), ~BrainMask(:));
-            y = y + alpha*delta(:).*mask_arr(:);
+            y = y + alpha*delta.*mask_arr;
 
-            % Regularize of chi11=chi22=chi33
-            delta = reshape(x((OriNum+9)*VoxNum+1: (OriNum+12)*VoxNum), VoxNum, 3);
-            y(1:VoxNum) = y(1:VoxNum) + (~STIParams.maskMSA(:)).* (delta(:,1)+delta(:,3));
-            y(4*VoxNum+1:5*VoxNum) = y(4*VoxNum+1:5*VoxNum) + (~STIParams.maskMSA(:)).* (-delta(:,1)+delta(:,2));
-            y(8*VoxNum+1:9*VoxNum) = y(8*VoxNum+1:9*VoxNum) + (~STIParams.maskMSA(:)).* (-delta(:,2)-delta(:,3));
+            % Regularize on ~maskMSA: chi11=chi22=chi33 
+            temp = alpha*x(((OriNum+9)*VoxNum+1):(OriNum+12)*VoxNum).*repmat(~STIParams.maskMSA(:), [3,1]); 
+            y(1:VoxNum)              = y(1:VoxNum) + temp(1:VoxNum) - temp(2*VoxNum+1:3*VoxNum);                         % x11
+            y((4*VoxNum+1):5*VoxNum) = y((4*VoxNum+1):5*VoxNum) - temp(1:VoxNum) + temp(VoxNum+1:2*VoxNum);              % -x22              
+            y((8*VoxNum+1):9*VoxNum) = y((8*VoxNum+1):9*VoxNum) - temp(VoxNum+1:2*VoxNum) + temp(2*VoxNum+1:3*VoxNum);   % -x33
             
             disp('Iteration of transpose A ...')
 

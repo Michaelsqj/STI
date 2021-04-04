@@ -6,7 +6,7 @@
 if ~isfolder('data')
     mkdir('data');
 end
-gen_phantom('chi_phantom');  % Save phantom in .data folder
+gen_phantom('data/chi_phantom');  % Save phantom in .data folder
 % Content: 'Params' (B0, gamma, fov, sizeVol, voxSize, pathname, filename_chi)
 %          'chi', 'BrainMask', 'chiavg', 'chiani'
 
@@ -15,7 +15,7 @@ gen_phantom('chi_phantom');  % Save phantom in .data folder
 %%%%%%%    Forward     %%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-STI_forward('chi_phantom');
+STI_forward('data/chi_phantom');
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -36,7 +36,7 @@ alpha = 10;
 beta = 0.1;
 tol = 1e-4;
 maxit = 50;
-STIParams_filename = 'STIParams.mat';
+STIParams_filename = 'data/STIParams.mat';
 [chi_r,flag,relres,iter,resvec,lsvec]=STI_inverse(STIParams_filename, maxit, tol, alpha);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%

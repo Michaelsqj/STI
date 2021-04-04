@@ -16,7 +16,6 @@ function STI_forward(filename)
     noiselevel = 0.033;
     Params.noiselevel = noiselevel;
     Params.Rorder = [1, 2, 3];     % rotation order   
-    Params.shift = -3.5;           % chemical shift -3.5 ppm
     BrainMask = mat.BrainMask;
 
     OriAngle = '20-40';
@@ -37,9 +36,9 @@ function STI_forward(filename)
         % simulate field map
         deltaB = chitensor2delta(chi, Params);
         % add chemical shift
-        deltaB = deltaB + (chi{1,1}~=0).*Param.shift;
+        deltaB = deltaB + mat.chemshift_map;
         % add noise
-        deltaB = deltaB + randn(size(chi{1,1}))*Params.noiselevel.*(std(deltaB(:)));        
+        deltaB = deltaB + randn(size(chi{1,1}))*Params.noiselevel.*(std(deltaB(:)));      
         
         save(Params.filename_deltaB, 'BrainMask', 'deltaB', 'Params')
         disp([Params.filename_deltaB, ' saved.'])
